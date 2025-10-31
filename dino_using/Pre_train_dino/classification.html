@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Label 96×96 (before/after) — Tailwind CDN</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <!-- Header -->
+  <header class="max-w-6xl mx-auto w-full px-4 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div class="flex items-center gap-2 flex-wrap">
+      <button id="pickBeforeBtn" class="px-3 py-2 rounded-xl border bg-white shadow text-sm font-semibold">📂 Chọn thư mục BEFORE</button>
+      <button id="pickAfterBtn"  class="px-3 py-2 rounded-xl border bg-white shadow text-sm font-semibold">📂 Chọn thư mục AFTER</button>
+      <label class="inline-flex items-center gap-2 px-3 py-2 rounded-full border bg-white shadow text-sm">
+        <input id="recursive" type="checkbox" class="scale-110" checked>
+        <span>duyệt thư mục con</span>
+      </label>
+      <label class="inline-flex items-center gap-2 px-3 py-2 rounded-full border bg-white shadow text-sm">
+        <input id="only96" type="checkbox" class="scale-110">
+        <span>chỉ nhận ảnh 96×96</span>
+      </label>
+      <span class="text-slate-500 text-sm px-3 py-2 rounded-full border bg-indigo-50">Đầu vào: cặp ảnh cùng tên</span>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button id="pickOutBtn"   class="px-3 py-2 rounded-xl border bg-white shadow text-sm font-semibold">🗂️ Chọn thư mục OUT</button>
+      <button id="exportBtn"    class="px-3 py-2 rounded-xl border bg-emerald-50 shadow text-sm font-semibold">🚀 Build dataset</button>
+      <button id="saveCsvBtn"   class="px-3 py-2 rounded-xl border bg-white shadow text-sm font-semibold">CSV phụ</button>
+      <button id="clearLocalBtn"class="px-3 py-2 rounded-xl border bg-amber-50 shadow text-sm font-semibold">Xóa cache nhãn</button>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="max-w-6xl mx-auto w-full px-4 pb-6 grid grid-cols-1 md:grid-cols-[420px_1fr] gap-4">
+    <!-- Stage -->
+    <section class="bg-white border rounded-2xl p-4 shadow">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-sm"><span class="font-semibold">Cặp ảnh:</span> <span id="curName" class="text-slate-500">—</span></div>
+        <div class="flex gap-2">
+          <button id="prevBtn" class="px-3 py-2 rounded-lg border bg-white shadow text-sm">← Trước (A)</button>
+          <button id="nextBtn" class="px-3 py-2 rounded-lg border bg-white shadow text-sm">Sau (D) →</button>
+        </div>
+      </div>
+
+      <!-- Viewer: two images -->
+      <div id="viewer" class="flex items-center justify-center gap-3 min-h-[360px] bg-slate-100 rounded-2xl border border-dashed">
+        <div class="text-slate-500 text-sm">Chưa có ảnh — hãy chọn thư mục <b>BEFORE</b> và <b>AFTER</b>.</div>
+      </div>
+
+      <!-- Labels -->
+      <div class="mt-4">
+        <div class="grid grid-cols-3 gap-2">
+          <button class="label-btn px-3 py-2 rounded-xl border bg-white shadow text-left text-sm" data-label="xoay&dịch chuyển" data-key="1">1) xoay&dịch chuyển</button>
+          <button class="label-btn px-3 py-2 rounded-xl border bg-white shadow text-left text-sm" data-label="mốc"              data-key="2">2) mốc</button>
+          <button class="label-btn px-3 py-2 rounded-xl border bg-white shadow text-left text-sm" data-label="thối"             data-key="3">3) thối</button>
+          <button class="label-btn px-3 py-2 rounded-xl border bg-white shadow text-left text-sm" data-label="đánh tráo"        data-key="4">4) đánh tráo</button>
+          <button class="label-btn px-3 py-2 rounded-xl border bg-white shadow text-left text-sm" data-label="thay đổi lớn"     data-key="5">5) thay đổi lớn</button>
+          <button id="skipBtn" class="px-3 py-2 rounded-xl border bg-amber-50 shadow text-left text-sm" data-key="0">0) Bỏ qua/Chưa rõ</button>
+        </div>
+
+        <div class="flex items-center gap-3 mt-3">
+          <div id="statText" class="text-xs text-slate-500">0/0 đã gán nhãn</div>
+          <progress id="prog" max="100" value="0" class="w-full h-3 rounded-full overflow-hidden"></progress>
+        </div>
+
+        <div class="mt-3 text-xs text-slate-500">
+          Phím tắt: <kbd class="px-1.5 py-0.5 rounded border bg-indigo-50">1..5</kbd> gán nhãn,
+          <kbd class="px-1.5 py-0.5 rounded border bg-indigo-50">A</kbd>/<kbd class="px-1.5 py-0.5 rounded border bg-indigo-50">D</kbd> chuyển ảnh,
+          <kbd class="px-1.5 py-0.5 rounded border bg-indigo-50">Backspace</kbd> xóa nhãn.
+        </div>
+
+        <div class="my-3 h-px bg-slate-200"></div>
+
+        <div class="flex flex-wrap gap-2 text-sm">
+          <label class="inline-flex items-center gap-2 px-3 py-2 rounded-full border bg-white shadow">
+            <input id="keepStructure" type="checkbox" class="scale-110" checked>
+            <span>giữ cấu trúc thư mục khi export</span>
+          </label>
+          <label class="inline-flex items-center gap-2 px-3 py-2 rounded-full border bg-white shadow">
+            <input id="overwrite" type="checkbox" class="scale-110">
+            <span>ghi đè nếu trùng tên</span>
+          </label>
+          <label class="inline-flex items-center gap-2 px-3 py-2 rounded-full border bg-white shadow">
+            <input id="exportSkipped" type="checkbox" class="scale-110">
+            <span>xuất cả mục Bỏ qua</span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Grid list -->
+    <section class="bg-white border rounded-2xl p-4 shadow">
+      <div class="flex items-center justify-between mb-3">
+        <strong>Danh sách cặp ảnh</strong>
+        <div class="text-xs text-slate-500 flex gap-3">
+          <span id="beforePath">BEFORE: —</span>
+          <span id="afterPath">AFTER: —</span>
+        </div>
+      </div>
+      <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-2 h-[560px] overflow-auto pr-1"></div>
+    </section>
+  </main>
+
+<script>
+(()=>{
+  /*** State ***/
+  let beforeDir = null, afterDir = null, outHandle = null;
+  let pairs = []; // [{name, key, before:{handle,url,w,h,rel}, after:{...}}]
+  let cur = -1;
+  let labels = new Map(); // key -> label
+  const LABELS = ["xoay&dịch chuyển","mốc","thối","đánh tráo","thay đổi lớn","Bỏ qua/Chưa rõ"];
+  const EXTSET = new Set(['.jpg','.jpeg','.png','.bmp','.webp','.gif']);
+
+  /*** Elements ***/
+  const pickBeforeBtn = document.getElementById('pickBeforeBtn');
+  const pickAfterBtn  = document.getElementById('pickAfterBtn');
+  const pickOutBtn    = document.getElementById('pickOutBtn');
+  const exportBtn     = document.getElementById('exportBtn');
+  const saveCsvBtn    = document.getElementById('saveCsvBtn');
+  const clearLocalBtn = document.getElementById('clearLocalBtn');
+
+  const viewer   = document.getElementById('viewer');
+  const grid     = document.getElementById('grid');
+  const curName  = document.getElementById('curName');
+  const statText = document.getElementById('statText');
+  const prog     = document.getElementById('prog');
+  const prevBtn  = document.getElementById('prevBtn');
+  const nextBtn  = document.getElementById('nextBtn');
+
+  const beforePath = document.getElementById('beforePath');
+  const afterPath  = document.getElementById('afterPath');
+
+  const recursive = document.getElementById('recursive');
+  const only96    = document.getElementById('only96');
+  const keepStructure = document.getElementById('keepStructure');
+  const overwrite = document.getElementById('overwrite');
+  const exportSkipped = document.getElementById('exportSkipped');
+
+  const labelButtons = [...document.querySelectorAll('.label-btn')];
+  const skipBtn      = document.getElementById('skipBtn');
+
+  /*** Persistence ***/
+  const LS_KEY = 'pair_labels_v1';
+  function loadCache(){
+    try{
+      const raw = localStorage.getItem(LS_KEY);
+      if(!raw) return;
+      const obj = JSON.parse(raw);
+      if(obj && obj.labels) labels = new Map(obj.labels);
+    }catch(e){ console.warn('Load cache error', e); }
+  }
+  function saveCache(){
+    try{
+      const payload = { labels: Array.from(labels.entries()) };
+      localStorage.setItem(LS_KEY, JSON.stringify(payload));
+    }catch(e){ console.warn('Save cache error', e); }
+  }
+  loadCache();
+
+  /*** Helpers ***/
+  function hasImageExt(name){
+    const i = name.lastIndexOf('.');
+    return i>=0 && EXTSET.has(name.slice(i).toLowerCase());
+  }
+  function humanPath(rootName, segs){ return [rootName, ...segs].join('/'); }
+  function basename(p){ const i=p.lastIndexOf('/'); return i>=0?p.slice(i+1):p; }
+
+  async function* walk(dir, segs=[]){
+    for await (const [name, handle] of dir.entries()){
+      if(handle.kind === 'file' && hasImageExt(name)){
+        yield { name, handle, segs:[...segs, name] };
+      }else if(handle.kind === 'directory' && recursive.checked){
+        yield* walk(handle, [...segs, name]);
+      }
+    }
+  }
+  function getImageSize(url){
+    return new Promise(res=>{
+      const img = new Image();
+      img.onload = ()=> res({w: img.naturalWidth, h: img.naturalHeight});
+      img.onerror = ()=> res({w:0,h:0});
+      img.src = url;
+    });
+  }
+
+  async function collectPairs(){
+    pairs = [];
+    if(!beforeDir || !afterDir) return;
+
+    // index by filename (simple & robust for your crop set)
+    const mapBefore = new Map(); // name -> {handle, rel}
+    for await (const it of walk(beforeDir)){
+      mapBefore.set(it.name, { handle: it.handle, rel: it.segs.join('/') });
+    }
+    const tmpPairs = [];
+    for await (const it of walk(afterDir)){
+      if(mapBefore.has(it.name)){
+        tmpPairs.push({
+          name: it.name,
+          key: it.name,           // cache key (filename)
+          before: { handle: mapBefore.get(it.name).handle, rel: mapBefore.get(it.name).rel },
+          after:  { handle: it.handle, rel: it.segs.join('/') }
+        });
+      }
+    }
+
+    // attach URLs + dims, filter 96×96 if required
+    pairs = [];
+    for(const p of tmpPairs){
+      const bfFile = await p.before.handle.getFile();
+      const afFile = await p.after.handle.getFile();
+      const bfUrl  = URL.createObjectURL(bfFile);
+      const afUrl  = URL.createObjectURL(afFile);
+      const bDims  = await getImageSize(bfUrl);
+      const aDims  = await getImageSize(afUrl);
+
+      const ok96 = (!only96.checked) || ((bDims.w===96 && bDims.h===96) && (aDims.w===96 && aDims.h===96));
+      if(ok96){
+        p.before.url = bfUrl; p.before.w = bDims.w; p.before.h = bDims.h;
+        p.after.url  = afUrl; p.after.w  = aDims.w; p.after.h  = aDims.h;
+        pairs.push(p);
+      }else{
+        URL.revokeObjectURL(bfUrl); URL.revokeObjectURL(afUrl);
+      }
+    }
+
+    // sort by filename (natural)
+    pairs.sort((a,b)=> a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:'base'}));
+  }
+
+  function shortLabel(label){
+    if(!label) return '—';
+    const map = {'xoay&dịch chuyển':'xoay','mốc':'mốc','thối':'thối','đánh tráo':'tráo','thay đổi lớn':'thay đổi'};
+    return map[label] || label;
+  }
+
+  function renderGrid(){
+  grid.innerHTML = '';
+  pairs.forEach((p, idx)=>{
+    const card = document.createElement('button');
+    card.className = 'group relative w-full rounded-2xl border overflow-hidden bg-white shadow hover:shadow-md transition';
+    card.title = p.name;
+    card.onclick = ()=> go(idx);
+
+    // khung thumbnail đôi
+    const wrap = document.createElement('div');
+    wrap.className = 'flex gap-0.5 items-center justify-center p-2';
+    const t1 = document.createElement('img');
+    t1.src = p.before.url; t1.alt = 'before'; t1.className = 'w-24 h-24 object-contain';
+    const t2 = document.createElement('img');
+    t2.src = p.after.url;  t2.alt = 'after';  t2.className = 'w-24 h-24 object-contain';
+    wrap.appendChild(t1); wrap.appendChild(t2);
+    card.appendChild(wrap);
+
+    // tên file
+    const bar = document.createElement('div');
+    bar.className = 'px-2 pb-2 text-xs text-slate-600 truncate';
+    bar.textContent = p.name;
+    card.appendChild(bar);
+
+    // badge nhãn overlay góc phải-trên
+    const lab = labels.get(p.key);
+    const badge = document.createElement('span');
+    badge.className = 'absolute top-1.5 right-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium shadow ' + labelChipClass(lab);
+    badge.textContent = shortLabel(lab);
+    card.appendChild(badge);
+
+    grid.appendChild(card);
+  });
+}
+
+
+  function updateStatus(){
+    const done = pairs.filter(p=> labels.has(p.key) && labels.get(p.key)!=='Bỏ qua/Chưa rõ').length;
+    const total = pairs.length;
+    statText.textContent = `${done}/${total} đã gán nhãn`;
+    prog.value = total ? Math.round(100*done/total) : 0;
+    prog.max = 100;
+  }
+
+  function showCurrent(){
+    viewer.innerHTML = '';
+    if(cur<0 || cur>=pairs.length){
+      viewer.innerHTML = '<div class="text-slate-500 text-sm">Hết ảnh — đã đến cuối</div>';
+      curName.textContent = '—';
+      return;
+    }
+    const p = pairs[cur];
+    curName.textContent = `${p.name}  (B ${p.before.w}×${p.before.h} | A ${p.after.w}×${p.after.h})`;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'flex items-center justify-center gap-3 w-full px-2 py-4';
+
+    const left = document.createElement('div');
+    left.className = 'flex flex-col items-center';
+    const lLabel = document.createElement('div');
+    lLabel.className = 'text-xs text-slate-500 mb-1'; lLabel.textContent = 'BEFORE';
+    const li = document.createElement('img');
+    li.src = p.before.url; li.alt = 'before'; li.className = 'w-80 h-80 object-contain bg-white rounded-xl border';
+    left.appendChild(lLabel); left.appendChild(li);
+
+    const right = document.createElement('div');
+    right.className = 'flex flex-col items-center';
+    const rLabel = document.createElement('div');
+    rLabel.className = 'text-xs text-slate-500 mb-1'; rLabel.textContent = 'AFTER';
+    const ri = document.createElement('img');
+    ri.src = p.after.url; ri.alt = 'after'; ri.className = 'w-80 h-80 object-contain bg-white rounded-xl border';
+    right.appendChild(rLabel); right.appendChild(ri);
+
+    wrap.appendChild(left); wrap.appendChild(right);
+    viewer.appendChild(wrap);
+  }
+  function go(i){ if(i<0)i=0; if(i>=pairs.length)i=pairs.length-1; cur=i; showCurrent(); }
+  function next(){ if(cur<pairs.length-1){ cur++; showCurrent(); } }
+  function prev(){ if(cur>0){ cur--; showCurrent(); } }
+
+  function assignLabel(label){
+    if(cur<0 || cur>=pairs.length) return;
+    const key = pairs[cur].key;
+    labels.set(key, label);
+    saveCache(); renderGrid(); updateStatus();
+    if(label!=='Bỏ qua/Chưa rõ') next();
+  }
+  function removeLabel(){
+    if(cur<0 || cur>=pairs.length) return;
+    labels.delete(pairs[cur].key);
+    saveCache(); renderGrid(); updateStatus();
+  }
+
+  function toCSV(){
+    const rows = [['filename','label','before_rel','after_rel','before_w','before_h','after_w','after_h']];
+    for(const p of pairs){
+      rows.push([p.name, labels.get(p.key)||'', p.before.rel, p.after.rel, p.before.w, p.before.h, p.after.w, p.after.h]);
+    }
+    return rows.map(r=> r.map(v=> `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  }
+  function downloadCSV(){
+    const blob = new Blob([toCSV()], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'labels_pairs.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  async function ensureSubdir(parent, name){ return await parent.getDirectoryHandle(name, {create:true}); }
+  async function ensurePathDir(parent, relPath){
+    // create nested dirs for relPath (without filename)
+    const segs = relPath.split('/').slice(0,-1);
+    let cur = parent;
+    for(const s of segs){
+      cur = await cur.getDirectoryHandle(s, {create:true});
+    }
+    return cur;
+  }
+  async function fileExists(dir, name){
+    try{ await dir.getFileHandle(name); return true; }catch(e){ return false; }
+  }
+  function safeName(base){ return base.replace(/[^\w\-.]+/g,'_'); }
+
+  async function exportDataset(){
+    if(!outHandle){ alert('Chưa chọn thư mục OUT.'); return; }
+
+    const classes = ['xoay&dịch chuyển','mốc','thối','đánh tráo','thay đổi lớn'];
+    const classDirs = {};
+    for(const c of classes) classDirs[c] = await ensureSubdir(outHandle, c);
+    if(exportSkipped.checked){
+      classDirs['Bỏ qua/Chưa rõ'] = await ensureSubdir(outHandle, 'Bỏ qua_Chưa rõ');
+    }
+
+    let count=0, exported=0, total=pairs.length;
+    for(const p of pairs){
+      const lab = labels.get(p.key);
+      if(!lab) continue;
+      if(lab==='Bỏ qua/Chưa rõ' && !exportSkipped.checked) continue;
+      const labelRoot = classDirs[lab]; if(!labelRoot) continue;
+
+      // create before/after subdirs
+      const beforeRoot = await ensureSubdir(labelRoot,'before');
+      const afterRoot  = await ensureSubdir(labelRoot,'after');
+
+      // decide target path/name
+      const targetRel = keepStructure.checked ? p.before.rel : p.name;
+      const tgtName = keepStructure.checked ? p.name : safeName(p.name);
+
+      // BEFORE
+      let beforeDir = keepStructure.checked ? await ensurePathDir(beforeRoot, targetRel) : beforeRoot;
+      // AFTER
+      let afterDir  = keepStructure.checked ? await ensurePathDir(afterRoot,  p.after.rel) : afterRoot;
+
+      // overwrite policy
+      let bName = tgtName, aName = tgtName;
+      if(!overwrite.checked){
+        const extIdx = tgtName.lastIndexOf('.');
+        const stem = extIdx>0?tgtName.slice(0,extIdx):tgtName;
+        const ext  = extIdx>0?tgtName.slice(extIdx):'';
+        let k=1, bn=bName, an=aName;
+        while(await fileExists(beforeDir, bn) || await fileExists(afterDir, an)){
+          bn = `${stem}__${k}${ext}`;
+          an = `${stem}__${k}${ext}`;
+          k++;
+        }
+        bName = bn; aName = an;
+      }
+
+      // write both
+      try{
+        // BEFORE
+        const bfFile = await p.before.handle.getFile();
+        const bfDest = await beforeDir.getFileHandle(bName, {create:true});
+        const bfW    = await bfDest.createWritable(); await bfW.write(await bfFile.arrayBuffer()); await bfW.close();
+        // AFTER
+        const afFile = await p.after.handle.getFile();
+        const afDest = await afterDir.getFileHandle(aName, {create:true});
+        const afW    = await afDest.createWritable(); await afW.write(await afFile.arrayBuffer()); await afW.close();
+        exported++;
+      }catch(e){ console.error('Export error', p.name, e); }
+
+      count++;
+      prog.value = Math.round(100*count/total);
+      statText.textContent = `Xuất ${exported} / ${count} / ${total}`;
+      await new Promise(r=>setTimeout(r));
+    }
+    alert(`Hoàn tất: ${exported} cặp ảnh đã được sao chép.`);
+  }
+
+  /*** Events ***/
+  pickBeforeBtn.onclick = async ()=>{
+    try{
+      beforeDir = await window.showDirectoryPicker();
+      beforePath.textContent = 'BEFORE: ' + beforeDir.name;
+      await collectPairs(); cur = pairs.length?0:-1; renderGrid(); showCurrent(); updateStatus();
+    }catch(e){ if(e?.name!=='AbortError') alert('Không thể mở BEFORE: ' + e.message); }
+  };
+  pickAfterBtn.onclick = async ()=>{
+    try{
+      afterDir = await window.showDirectoryPicker();
+      afterPath.textContent = 'AFTER: ' + afterDir.name;
+      await collectPairs(); cur = pairs.length?0:-1; renderGrid(); showCurrent(); updateStatus();
+    }catch(e){ if(e?.name!=='AbortError') alert('Không thể mở AFTER: ' + e.message); }
+  };
+  pickOutBtn.onclick  = async()=>{ try{ outHandle = await window.showDirectoryPicker({mode:'readwrite'});}catch(e){ if(e?.name!=='AbortError') alert('Không thể chọn OUT: '+e.message);} };
+
+  exportBtn.onclick   = exportDataset;
+  saveCsvBtn.onclick  = downloadCSV;
+  clearLocalBtn.onclick = ()=>{
+    if(confirm('Xóa toàn bộ nhãn trong cache cục bộ?')){ labels.clear(); saveCache(); renderGrid(); updateStatus(); }
+  };
+
+  recursive.onchange = only96.onchange = async ()=>{
+    if(beforeDir && afterDir){ await collectPairs(); renderGrid(); showCurrent(); updateStatus(); }
+  };
+
+  prevBtn.onclick = prev; nextBtn.onclick = next; skipBtn.onclick = ()=>assignLabel('Bỏ qua/Chưa rõ');
+  labelButtons.forEach(btn=> btn.onclick = ()=> assignLabel(btn.dataset.label));
+
+  window.addEventListener('keydown', (ev)=>{
+    const k = ev.key.toLowerCase();
+    if(k==='a'){ prev(); ev.preventDefault(); }
+    else if(k==='d'){ next(); ev.preventDefault(); }
+    else if(k==='backspace'){ removeLabel(); ev.preventDefault(); }
+    else if(/[0-5]/.test(k)){
+      if(k==='0') assignLabel('Bỏ qua/Chưa rõ');
+      else{
+        const idx = Number(k)-1; const label = LABELS[idx];
+        if(label) assignLabel(label);
+      }
+      ev.preventDefault();
+    }
+  });
+
+  if(!('showDirectoryPicker' in window)){
+    alert('Trình duyệt không hỗ trợ File System Access API. Hãy dùng Chrome/Edge mới.');
+  }
+})();
+function labelChipClass(lab){
+  switch(lab){
+    case 'xoay&dịch chuyển': return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
+    case 'mốc':              return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+    case 'thối':             return 'bg-rose-50 text-rose-700 border border-rose-200';
+    case 'đánh tráo':        return 'bg-amber-50 text-amber-700 border border-amber-200';
+    case 'thay đổi lớn':     return 'bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200';
+    case 'Bỏ qua/Chưa rõ':   return 'bg-slate-50 text-slate-600 border border-slate-200';
+    default:                 return 'bg-white text-slate-500 border';
+  }
+}
+
+</script>
+<!-- preload tailwind classes cho badge -->
+<div class="hidden">
+    <span class="bg-indigo-50 text-indigo-700 border border-indigo-200"></span>
+    <span class="bg-emerald-50 text-emerald-700 border border-emerald-200"></span>
+    <span class="bg-rose-50 text-rose-700 border border-rose-200"></span>
+    <span class="bg-amber-50 text-amber-700 border border-amber-200"></span>
+    <span class="bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200"></span>
+    <span class="bg-slate-50 text-slate-600 border border-slate-200"></span>
+  </div>
+  
+</body>
+</html>

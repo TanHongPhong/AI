@@ -1,0 +1,255 @@
+{
+  "image_info": {
+    "img1_path": "data_canonical_3\\le4\\708416__f000938__deskew15deg__rot0__1350x744.png",
+    "img2_path": "data_canonical_4\\le4\\708416__f000174__deskew0deg__rot180__1293x768.png",
+    "image_size": {
+      "width": 1344,
+      "height": 742
+    },
+    "patch_size": 14,
+    "patches": {
+      "width": 96,
+      "height": 53
+    }
+  },
+  "roi_info": {
+    "roi_size": {
+      "width": 1000,
+      "height": 440
+    },
+    "roi_position": {
+      "x": 172,
+      "y": 151
+    },
+    "thresholds": {
+      "thr_in": 0.7,
+      "thr_out": 0.35
+    }
+  },
+  "bounding_boxes": [
+    {
+      "id": 0,
+      "position": {
+        "x": 1088,
+        "y": 567
+      },
+      "size": {
+        "width": 84,
+        "height": 37
+      },
+      "center": {
+        "x": 1130,
+        "y": 585
+      },
+      "area": 3108
+    },
+    {
+      "id": 1,
+      "position": {
+        "x": 444,
+        "y": 544
+      },
+      "size": {
+        "width": 53,
+        "height": 47
+      },
+      "center": {
+        "x": 470,
+        "y": 567
+      },
+      "area": 2491
+    },
+    {
+      "id": 2,
+      "position": {
+        "x": 552,
+        "y": 492
+      },
+      "size": {
+        "width": 65,
+        "height": 57
+      },
+      "center": {
+        "x": 584,
+        "y": 520
+      },
+      "area": 3705
+    },
+    {
+      "id": 3,
+      "position": {
+        "x": 1088,
+        "y": 446
+      },
+      "size": {
+        "width": 131,
+        "height": 67
+      },
+      "center": {
+        "x": 1153,
+        "y": 479
+      },
+      "area": 8777
+    },
+    {
+      "id": 4,
+      "position": {
+        "x": 418,
+        "y": 414
+      },
+      "size": {
+        "width": 132,
+        "height": 83
+      },
+      "center": {
+        "x": 484,
+        "y": 455
+      },
+      "area": 10956
+    },
+    {
+      "id": 5,
+      "position": {
+        "x": 214,
+        "y": 408
+      },
+      "size": {
+        "width": 44,
+        "height": 51
+      },
+      "center": {
+        "x": 236,
+        "y": 433
+      },
+      "area": 2244
+    },
+    {
+      "id": 6,
+      "position": {
+        "x": 1039,
+        "y": 379
+      },
+      "size": {
+        "width": 83,
+        "height": 84
+      },
+      "center": {
+        "x": 1080,
+        "y": 421
+      },
+      "area": 6972
+    },
+    {
+      "id": 7,
+      "position": {
+        "x": 765,
+        "y": 343
+      },
+      "size": {
+        "width": 135,
+        "height": 141
+      },
+      "center": {
+        "x": 832,
+        "y": 413
+      },
+      "area": 19035
+    },
+    {
+      "id": 8,
+      "position": {
+        "x": 208,
+        "y": 338
+      },
+      "size": {
+        "width": 153,
+        "height": 147
+      },
+      "center": {
+        "x": 284,
+        "y": 411
+      },
+      "area": 22491
+    },
+    {
+      "id": 9,
+      "position": {
+        "x": 1048,
+        "y": 307
+      },
+      "size": {
+        "width": 41,
+        "height": 63
+      },
+      "center": {
+        "x": 1068,
+        "y": 338
+      },
+      "area": 2583
+    },
+    {
+      "id": 10,
+      "position": {
+        "x": 172,
+        "y": 260
+      },
+      "size": {
+        "width": 31,
+        "height": 97
+      },
+      "center": {
+        "x": 187,
+        "y": 308
+      },
+      "area": 3007
+    },
+    {
+      "id": 11,
+      "position": {
+        "x": 780,
+        "y": 215
+      },
+      "size": {
+        "width": 66,
+        "height": 53
+      },
+      "center": {
+        "x": 813,
+        "y": 241
+      },
+      "area": 3498
+    },
+    {
+      "id": 12,
+      "position": {
+        "x": 1028,
+        "y": 210
+      },
+      "size": {
+        "width": 81,
+        "height": 77
+      },
+      "center": {
+        "x": 1068,
+        "y": 248
+      },
+      "area": 6237
+    },
+    {
+      "id": 13,
+      "position": {
+        "x": 393,
+        "y": 208
+      },
+      "size": {
+        "width": 216,
+        "height": 138
+      },
+      "center": {
+        "x": 501,
+        "y": 277
+      },
+      "area": 29808
+    }
+  ]
+}
