@@ -575,8 +575,9 @@ def parse_args() -> Args:
     p.add_argument('--use_focal', action='store_true')
     p.add_argument('--label_smoothing', default=0.05, type=float)
     p.add_argument('--class_weights', default=None, type=str)
-    p.add_argument('--add_delta', action='store_true')
+    p.add_argument('--add_delta', action='store_true', help='Add delta channel (disabled by default)')
     p.add_argument('--se_before_head', action='store_true')
+    p.set_defaults(add_delta=False)  # Đảm bảo delta tắt mặc định
     p.add_argument('--dropout', default=0.0, type=float)
     p.add_argument('--workers', default=4, type=int)
     p.add_argument('--seed', default=42, type=int)

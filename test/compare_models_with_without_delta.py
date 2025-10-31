@@ -34,14 +34,39 @@ except Exception:
 # Import model architecture and dataset from training script
 script_dir = os.path.dirname(os.path.abspath(__file__))
 workspace_root = os.path.dirname(script_dir)
-train_script_path = os.path.join(workspace_root, 'dino_using', 'error_train', 'change3d_train_128x128.py')
+train_script_path = os.path.join(workspace_root, 'dino_using', 'error_train', 'change3d_train_128x128_hadam.py')
 sys.path.insert(0, os.path.dirname(train_script_path))
 
-from change3d_train_128x128 import (
+from change3d_train_128x128_hadam import (
     Change3DNet, DirPairsDataset, build_pairs_from_dir, collate_dir_pairs
 )
 
 IMG_EXTS = {'.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.webp'}
+
+
+def find_checkpoint_with_delta_hadamard(runs_dir: str = 'runs/change3d', pattern: str = 'best_change3d_dir.pth') -> Optional[str]:
+    """Tìm checkpoint mới nhất có cả delta và hadamard enabled"""
+    matches = []
+    for root, dirs, files in os.walk(runs_dir):
+        if pattern in files:
+            ckpt_path = os.path.join(root, pattern)
+            try:
+                ckpt = torch.load(ckpt_path, map_location='cpu')
+                ckpt_args = ckpt.get('args', {})
+                add_delta = bool(ckpt_args.get('add_delta', False))
+                add_hadamard = bool(ckpt_args.get('add_hadamard', False))
+                if add_delta and add_hadamard:
+                    mtime = os.path.getmtime(ckpt_path)
+                    matches.append((ckpt_path, mtime))
+            except Exception as e:
+                continue
+    
+    if not matches:
+        return None
+    
+    # Trả về checkpoint mới nhất
+    matches.sort(key=lambda x: x[1], reverse=True)
+    return matches[0][0]
 
 
 @dataclass
@@ -75,9 +100,17 @@ def load_model_from_checkpoint(ckpt_path: str, device: torch.device) -> Tuple[nn
     
     class_to_id = {c: i for i, c in enumerate(classes)}
     add_delta = bool(ckpt_args.get('add_delta', False))
+    add_hadamard = bool(ckpt_args.get('add_hadamard', False))
     se_before_head = bool(ckpt_args.get('se_before_head', False))
     dropout = float(ckpt_args.get('dropout', 0.0))
-    in_ch = 6 if add_delta else 3
+    
+    # Tính số input channels
+    in_ch = 3  # RGB base
+    if add_delta:
+        in_ch += 3
+    if add_hadamard:
+        in_ch += 3
+    
     num_classes = len(classes)
     
     # Build model
@@ -91,12 +124,14 @@ def load_model_from_checkpoint(ckpt_path: str, device: torch.device) -> Tuple[nn
         'classes': classes,
         'class_to_id': class_to_id,
         'add_delta': add_delta,
+        'add_hadamard': add_hadamard,
         'se_before_head': se_before_head,
         'dropout': dropout,
-        'num_classes': num_classes
+        'num_classes': num_classes,
+        'in_ch': in_ch
     }
     
-    print(f"[LOAD] Model loaded: in_ch={in_ch}, num_classes={num_classes}, add_delta={add_delta}")
+    print(f"[LOAD] Model loaded: in_ch={in_ch} (RGB=3, +Δ={'ON' if add_delta else 'OFF'}, +⊙={'ON' if add_hadamard else 'OFF'}), num_classes={num_classes}")
     return model, metadata
 
 
@@ -196,116 +231,117 @@ def save_results_csv(results: List[EvaluationResult], classes: List[str], output
     with open(output_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         
-        # Header
-        header = ['Metric', 'Model_NoDelta', 'Model_Delta']
+        # Header - hỗ trợ nhiều models
+        model_names = [r.model_name for r in results]
+        header = ['Metric'] + model_names
         writer.writerow(header)
         
         # Overall metrics
-        writer.writerow(['Accuracy', f"{results[0].accuracy:.4f}", f"{results[1].accuracy:.4f}"])
-        writer.writerow(['Macro F1', f"{results[0].macro_f1:.4f}", f"{results[1].macro_f1:.4f}"])
-        if results[0].roc_auc is not None and results[1].roc_auc is not None:
-            writer.writerow(['ROC-AUC', f"{results[0].roc_auc:.4f}", f"{results[1].roc_auc:.4f}"])
-        writer.writerow(['False Alarm Rate', f"{results[0].far:.4f}", f"{results[1].far:.4f}"])
-        writer.writerow(['Num Samples', results[0].num_samples, results[1].num_samples])
+        writer.writerow(['Accuracy'] + [f"{r.accuracy:.4f}" for r in results])
+        writer.writerow(['Macro F1'] + [f"{r.macro_f1:.4f}" for r in results])
+        if all(r.roc_auc is not None for r in results):
+            writer.writerow(['ROC-AUC'] + [f"{r.roc_auc:.4f}" for r in results])
+        writer.writerow(['False Alarm Rate'] + [f"{r.far:.4f}" for r in results])
+        writer.writerow(['Num Samples'] + [r.num_samples for r in results])
         writer.writerow([])
         
         # Per-class F1
         writer.writerow(['Per-Class F1 Score'])
         for i, cls in enumerate(classes):
-            writer.writerow([f"F1_{cls}", f"{results[0].per_class_f1[i]:.4f}", f"{results[1].per_class_f1[i]:.4f}"])
+            writer.writerow([f"F1_{cls}"] + [f"{r.per_class_f1[i]:.4f}" for r in results])
         writer.writerow([])
         
         # Per-class Precision
         writer.writerow(['Per-Class Precision'])
         for i, cls in enumerate(classes):
-            writer.writerow([f"Precision_{cls}", f"{results[0].per_class_precision[i]:.4f}", f"{results[1].per_class_precision[i]:.4f}"])
+            writer.writerow([f"Precision_{cls}"] + [f"{r.per_class_precision[i]:.4f}" for r in results])
         writer.writerow([])
         
         # Per-class Recall
         writer.writerow(['Per-Class Recall'])
         for i, cls in enumerate(classes):
-            writer.writerow([f"Recall_{cls}", f"{results[0].per_class_recall[i]:.4f}", f"{results[1].per_class_recall[i]:.4f}"])
+            writer.writerow([f"Recall_{cls}"] + [f"{r.per_class_recall[i]:.4f}" for r in results])
 
 
 def save_results_markdown(results: List[EvaluationResult], classes: List[str], output_path: str):
     """Lưu kết quả dạng Markdown table"""
     with open(output_path, 'w', encoding='utf-8') as f:
-        f.write("# So sánh Model: Có Delta vs Không Delta\n\n")
+        model_names = [r.model_name for r in results]
+        f.write("# So sánh Models Change3D\n\n")
         
         # Overall metrics table
         f.write("## Overall Metrics\n\n")
-        f.write("| Metric | Không Delta | Có Delta |\n")
-        f.write("|--------|-------------|----------|\n")
-        f.write(f"| **Accuracy** | {results[0].accuracy:.4f} | {results[1].accuracy:.4f} |\n")
-        f.write(f"| **Macro F1** | {results[0].macro_f1:.4f} | {results[1].macro_f1:.4f} |\n")
-        if results[0].roc_auc is not None and results[1].roc_auc is not None:
-            f.write(f"| **ROC-AUC** | {results[0].roc_auc:.4f} | {results[1].roc_auc:.4f} |\n")
-        f.write(f"| **False Alarm Rate (FAR)** | {results[0].far:.4f} | {results[1].far:.4f} |\n")
-        f.write(f"| **Số lượng mẫu** | {results[0].num_samples} | {results[1].num_samples} |\n")
+        # Header
+        header = "| Metric |"
+        separator = "|--------|"
+        for name in model_names:
+            header += f" {name} |"
+            separator += "-----------|"
+        f.write(header + "\n")
+        f.write(separator + "\n")
+        
+        # Rows
+        f.write(f"| **Accuracy** | {' | '.join([f'{r.accuracy:.4f}' for r in results])} |\n")
+        f.write(f"| **Macro F1** | {' | '.join([f'{r.macro_f1:.4f}' for r in results])} |\n")
+        if all(r.roc_auc is not None for r in results):
+            f.write(f"| **ROC-AUC** | {' | '.join([f'{r.roc_auc:.4f}' for r in results])} |\n")
+        f.write(f"| **False Alarm Rate (FAR)** | {' | '.join([f'{r.far:.4f}' for r in results])} |\n")
+        f.write(f"| **Số lượng mẫu** | {' | '.join([str(r.num_samples) for r in results])} |\n")
         f.write("\n")
         
         # Per-class metrics
         f.write("## Per-Class Metrics\n\n")
         f.write("### F1 Score\n\n")
-        f.write("| Class | Không Delta | Có Delta |\n")
-        f.write("|-------|-------------|----------|\n")
+        header = "| Class |"
+        separator = "|-------|"
+        for name in model_names:
+            header += f" {name} |"
+            separator += "-----------|"
+        f.write(header + "\n")
+        f.write(separator + "\n")
         for i, cls in enumerate(classes):
-            f.write(f"| {cls} | {results[0].per_class_f1[i]:.4f} | {results[1].per_class_f1[i]:.4f} |\n")
+            f.write(f"| {cls} | {' | '.join([f'{r.per_class_f1[i]:.4f}' for r in results])} |\n")
         f.write("\n")
         
         f.write("### Precision\n\n")
-        f.write("| Class | Không Delta | Có Delta |\n")
-        f.write("|-------|-------------|----------|\n")
+        f.write(header + "\n")
+        f.write(separator + "\n")
         for i, cls in enumerate(classes):
-            f.write(f"| {cls} | {results[0].per_class_precision[i]:.4f} | {results[1].per_class_precision[i]:.4f} |\n")
+            f.write(f"| {cls} | {' | '.join([f'{r.per_class_precision[i]:.4f}' for r in results])} |\n")
         f.write("\n")
         
         f.write("### Recall\n\n")
-        f.write("| Class | Không Delta | Có Delta |\n")
-        f.write("|-------|-------------|----------|\n")
+        f.write(header + "\n")
+        f.write(separator + "\n")
         for i, cls in enumerate(classes):
-            f.write(f"| {cls} | {results[0].per_class_recall[i]:.4f} | {results[1].per_class_recall[i]:.4f} |\n")
+            f.write(f"| {cls} | {' | '.join([f'{r.per_class_recall[i]:.4f}' for r in results])} |\n")
 
 
 def save_results_json(results: List[EvaluationResult], classes: List[str], output_path: str):
     """Lưu kết quả dạng JSON"""
-    data = {
-        'models': {
-            'no_delta': {
-                'name': results[0].model_name,
-                'accuracy': results[0].accuracy,
-                'macro_f1': results[0].macro_f1,
-                'roc_auc': results[0].roc_auc,
-                'far': results[0].far,
-                'num_samples': results[0].num_samples,
-                'per_class': {
-                    cls: {
-                        'f1': results[0].per_class_f1[i],
-                        'precision': results[0].per_class_precision[i],
-                        'recall': results[0].per_class_recall[i]
-                    }
-                    for i, cls in enumerate(classes)
-                },
-                'confusion_matrix': results[0].confusion_matrix.tolist()
+    models_dict = {}
+    for result in results:
+        key = result.model_name.lower().replace(' ', '_').replace('&', 'and').replace('+', '_')
+        models_dict[key] = {
+            'name': result.model_name,
+            'accuracy': result.accuracy,
+            'macro_f1': result.macro_f1,
+            'roc_auc': result.roc_auc,
+            'far': result.far,
+            'num_samples': result.num_samples,
+            'per_class': {
+                cls: {
+                    'f1': result.per_class_f1[i],
+                    'precision': result.per_class_precision[i],
+                    'recall': result.per_class_recall[i]
+                }
+                for i, cls in enumerate(classes)
             },
-            'with_delta': {
-                'name': results[1].model_name,
-                'accuracy': results[1].accuracy,
-                'macro_f1': results[1].macro_f1,
-                'roc_auc': results[1].roc_auc,
-                'far': results[1].far,
-                'num_samples': results[1].num_samples,
-                'per_class': {
-                    cls: {
-                        'f1': results[1].per_class_f1[i],
-                        'precision': results[1].per_class_precision[i],
-                        'recall': results[1].per_class_recall[i]
-                    }
-                    for i, cls in enumerate(classes)
-                },
-                'confusion_matrix': results[1].confusion_matrix.tolist()
-            }
-        },
+            'confusion_matrix': result.confusion_matrix.tolist()
+        }
+    
+    data = {
+        'models': models_dict,
         'classes': classes
     }
     
@@ -314,13 +350,16 @@ def save_results_json(results: List[EvaluationResult], classes: List[str], outpu
 
 
 def main():
-    parser = argparse.ArgumentParser(description='So sánh 2 models Change3D: có delta vs không delta')
+    parser = argparse.ArgumentParser(description='So sánh models Change3D: không delta, có delta, có delta+hadamard')
     parser.add_argument('--ckpt_no_delta', 
                        default=r'runs\change3d\20251031_224419_nodenta\best_change3d_dir.pth',
                        type=str, help='Checkpoint không có delta')
     parser.add_argument('--ckpt_with_delta',
                        default=r'runs\change3d\20251031_230655\best_change3d_dir.pth',
                        type=str, help='Checkpoint có delta')
+    parser.add_argument('--ckpt_delta_hadamard',
+                       default=None,
+                       type=str, help='Checkpoint có delta + hadamard (optional, nếu None sẽ skip)')
     parser.add_argument('--test_dir',
                        default=r'outputs\sum\dataset_new\val',
                        type=str, help='Thư mục test set (chứa các class subfolders)')
@@ -370,14 +409,15 @@ def main():
     
     print(f"[DATA] Test set: {len(test_dataset)} samples")
     
-    # Evaluate cả 2 models
-    # Tạo dataset riêng cho từng model (vì add_delta khác nhau)
-    def build_dataset_for_model(add_delta: bool):
-        """Build dataset với add_delta flag đúng"""
+    # Evaluate các models
+    # Tạo dataset riêng cho từng model (vì add_delta và add_hadamard khác nhau)
+    def build_dataset_for_model(add_delta: bool, add_hadamard: bool):
+        """Build dataset với add_delta và add_hadamard flags đúng"""
         class TestDataset(Dataset):
-            def __init__(self, base_dataset: DirPairsDataset, add_delta: bool):
+            def __init__(self, base_dataset: DirPairsDataset, add_delta: bool, add_hadamard: bool):
                 self.samples = base_dataset.samples
                 self.add_delta = add_delta
+                self.add_hadamard = add_hadamard
                 self.size = 128
             
             def __len__(self):
@@ -391,16 +431,26 @@ def main():
                 img2 = img2.resize((self.size, self.size), Image.BILINEAR)
                 t1 = TF.to_tensor(img1)
                 t2 = TF.to_tensor(img2)
-                x = torch.stack([t1, t2], dim=1)
+                x = torch.stack([t1, t2], dim=1)  # [C, T=2, H, W]
+                
                 if self.add_delta:
-                    delta = torch.abs(t2 - t1)
-                    x = torch.cat([x, delta.unsqueeze(1).repeat(1, 2, 1, 1)], dim=0)
+                    delta = torch.abs(t2 - t1)  # [C,H,W]
+                    deltaT = delta.unsqueeze(1).repeat(1, 2, 1, 1)  # [C,2,H,W]
+                    x = torch.cat([x, deltaT], dim=0)  # [C+3,2,H,W]
+                
+                if self.add_hadamard:
+                    hadam = t2 * t1  # [C,H,W]
+                    hadamT = hadam.unsqueeze(1).repeat(1, 2, 1, 1)  # [C,2,H,W]
+                    x = torch.cat([x, hadamT], dim=0)  # [+3,2,H,W]
+                
                 return x, y
         
-        return TestDataset(test_dataset, add_delta)
+        return TestDataset(test_dataset, add_delta, add_hadamard)
+    
+    results = []
     
     # Evaluate model không delta
-    test_dataset_no_delta = build_dataset_for_model(add_delta=False)
+    test_dataset_no_delta = build_dataset_for_model(add_delta=False, add_hadamard=False)
     test_loader_no_delta = DataLoader(
         test_dataset_no_delta,
         batch_size=args.batch_size,
@@ -414,9 +464,10 @@ def main():
         model_no_delta, test_loader_no_delta, device,
         "No_Delta", classes
     )
+    results.append(result_no_delta)
     
     # Evaluate model có delta
-    test_dataset_with_delta = build_dataset_for_model(add_delta=True)
+    test_dataset_with_delta = build_dataset_for_model(add_delta=True, add_hadamard=False)
     test_loader_with_delta = DataLoader(
         test_dataset_with_delta,
         batch_size=args.batch_size,
@@ -430,8 +481,41 @@ def main():
         model_with_delta, test_loader_with_delta, device,
         "With_Delta", classes
     )
+    results.append(result_with_delta)
     
-    results = [result_no_delta, result_with_delta]
+    # Evaluate model có delta + hadamard (nếu có checkpoint)
+    ckpt_delta_hadamard = args.ckpt_delta_hadamard
+    if not ckpt_delta_hadamard:
+        # Tự động tìm checkpoint delta+hadamard mới nhất
+        print("[INFO] Tự động tìm checkpoint Delta+Hadamard mới nhất...")
+        ckpt_delta_hadamard = find_checkpoint_with_delta_hadamard()
+        if ckpt_delta_hadamard:
+            print(f"[INFO] Tìm thấy checkpoint Delta+Hadamard: {ckpt_delta_hadamard}")
+    
+    if ckpt_delta_hadamard and os.path.isfile(ckpt_delta_hadamard):
+        print(f"\n[LOAD] Loading Delta+Hadamard checkpoint...")
+        model_delta_hadamard, meta_delta_hadamard = load_model_from_checkpoint(ckpt_delta_hadamard, device)
+        
+        test_dataset_delta_hadamard = build_dataset_for_model(add_delta=True, add_hadamard=True)
+        test_loader_delta_hadamard = DataLoader(
+            test_dataset_delta_hadamard,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.workers,
+            pin_memory=True,
+            collate_fn=collate_dir_pairs
+        )
+        
+        result_delta_hadamard = evaluate_model(
+            model_delta_hadamard, test_loader_delta_hadamard, device,
+            "Delta+Hadamard", classes
+        )
+        results.append(result_delta_hadamard)
+    else:
+        if args.ckpt_delta_hadamard:
+            print(f"[WARN] Checkpoint Delta+Hadamard không tồn tại: {args.ckpt_delta_hadamard}, sẽ bỏ qua.")
+        else:
+            print("[INFO] Không tìm thấy checkpoint Delta+Hadamard, chỉ so sánh 2 models.")
     
     # Save results
     print("\n[SAVE] Saving results...")
@@ -440,11 +524,8 @@ def main():
     save_results_json(results, classes, os.path.join(args.output_dir, 'comparison.json'))
     
     print("\n[RESULTS]")
-    print(f"Accuracy: No Delta={result_no_delta.accuracy:.4f}, With Delta={result_with_delta.accuracy:.4f}")
-    print(f"Macro F1: No Delta={result_no_delta.macro_f1:.4f}, With Delta={result_with_delta.macro_f1:.4f}")
-    if result_no_delta.roc_auc and result_with_delta.roc_auc:
-        print(f"ROC-AUC: No Delta={result_no_delta.roc_auc:.4f}, With Delta={result_with_delta.roc_auc:.4f}")
-    print(f"FAR: No Delta={result_no_delta.far:.4f}, With Delta={result_with_delta.far:.4f}")
+    for result in results:
+        print(f"{result.model_name}: Accuracy={result.accuracy:.4f}, Macro F1={result.macro_f1:.4f}, FAR={result.far:.4f}")
     print(f"\n[OUTPUT] Results saved to: {args.output_dir}/")
 
 
