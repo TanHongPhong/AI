@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-change3d_train_128x128.py — same as change3d_train_96x96.py but input size = 128×128
-- All augmentation/output image sizes updated to 128
-- Non-augment fallback resize updated to 128
+change3d_train_128x128_no_delta.py — 128×128 input, delta channel fully removed
+- No delta creation/concatenation anywhere
+- No CLI flag for add_delta
+- save_val_samples no longer saves delta images
 """
 
 import os
@@ -213,7 +214,7 @@ class PairedAugment:
             t = torch.where(t <= 0.04045, t / 12.92, ((t + 0.055) / 1.055) ** 2.4)
         return t
 
-    def __call__(self, img1: Image.Image, img2: Image.Image, label: int, add_delta: bool = False) -> torch.Tensor:
+    def __call__(self, img1: Image.Image, img2: Image.Image, label: int) -> torch.Tensor:
         size = self.cfg.out_hw
         img1 = _resize(img1, size)
         img2 = _resize(img2, size)
@@ -243,11 +244,6 @@ class PairedAugment:
         t2 = add_gaussian_noise(self._to_tensor(img2), self.cfg.noise_std)
 
         x = torch.stack([t1, t2], dim=1)  # [C, T=2, H, W]
-
-        if add_delta:
-            delta = torch.abs(t2 - t1)  # [C,H,W]
-            deltaT = delta.unsqueeze(1).repeat(1, 2, 1, 1)  # [C,2,H,W]
-            x = torch.cat([x, deltaT], dim=0)  # [C+3,2,H,W]
         return x
 
 
@@ -257,11 +253,9 @@ class PairedAugment:
 
 class DirPairsDataset(Dataset):
     def __init__(self, split_dir: str, classes: List[str], class_to_id: Dict[str, int],
-                 augmenter: Optional[PairedAugment], add_delta: bool,
-                 diff_photometric_ids: List[int]):
+                 augmenter: Optional[PairedAugment], diff_photometric_ids: List[int]):
         self.samples: List[Tuple[str, str, int]] = []  # (t1, t2, y)
         self.augmenter = augmenter
-        self.add_delta = add_delta
         self.diff_photometric_ids = set(diff_photometric_ids)
 
         for cname in classes:
@@ -284,7 +278,7 @@ class DirPairsDataset(Dataset):
         img1 = Image.open(p1).convert('RGB')
         img2 = Image.open(p2).convert('RGB')
         if self.augmenter is not None:
-            x = self.augmenter(img1, img2, y, add_delta=self.add_delta)
+            x = self.augmenter(img1, img2, y)
         else:
             size = 128
             img1 = img1.resize((size, size), Image.BILINEAR)
@@ -292,13 +286,11 @@ class DirPairsDataset(Dataset):
             t1 = TF.to_tensor(img1)
             t2 = TF.to_tensor(img2)
             x = torch.stack([t1, t2], dim=1)
-            if self.add_delta:
-                delta = torch.abs(t2 - t1)
-                x = torch.cat([x, delta.unsqueeze(1).repeat(1,2,1,1)], dim=0)
         return x, y
 
 
 # Top-level collate function (must be picklable for Windows DataLoader)
+
 def collate_dir_pairs(batch):
     xs, ys = zip(*batch)
     x = torch.stack(xs, dim=0)
@@ -435,6 +427,7 @@ def ensure_out_dir(base_out: str) -> str:
     os.makedirs(out, exist_ok=True)
     return out
 
+
 def save_confusion_matrix(cm: np.ndarray, class_names: List[str], out_png: str, normalize: bool = True):
     # Preserve counts for annotation
     cm_counts = cm.copy()
@@ -492,6 +485,7 @@ def save_confusion_matrix(cm: np.ndarray, class_names: List[str], out_png: str, 
     plt.savefig(out_png, dpi=150)
     plt.close()
 
+
 def save_per_class_f1(per_cls_f1: List[float], class_names: List[str], out_png: str):
     plt.figure()
     x = np.arange(len(class_names))
@@ -502,6 +496,7 @@ def save_per_class_f1(per_cls_f1: List[float], class_names: List[str], out_png: 
     plt.tight_layout()
     plt.savefig(out_png, dpi=150)
     plt.close()
+
 
 def save_curve(values: List[float], ylabel: str, title: str, out_png: str):
     plt.figure()
@@ -514,9 +509,11 @@ def save_curve(values: List[float], ylabel: str, title: str, out_png: str):
     plt.savefig(out_png, dpi=150)
     plt.close()
 
+
 def tensor_to_pil(img_t: torch.Tensor) -> Image.Image:
     arr = (img_t.clamp(0,1).permute(1,2,0).cpu().numpy() * 255.0).astype(np.uint8)
     return Image.fromarray(arr)
+
 
 def save_val_samples(val_loader: DataLoader, out_dir: str, max_samples: int = 8):
     os.makedirs(out_dir, exist_ok=True)
@@ -525,11 +522,9 @@ def save_val_samples(val_loader: DataLoader, out_dir: str, max_samples: int = 8)
         for i in range(N):
             t1 = x[i, 0:3, 0]
             t2 = x[i, 0:3, 1]
-            delta = torch.abs(t2 - t1)
             base = os.path.join(out_dir, f"sample_{i:02d}")
             tensor_to_pil(t1).save(base + "_t1.png")
             tensor_to_pil(t2).save(base + "_t2.png")
-            tensor_to_pil(delta).save(base + "_delta.png")
         break
 
 
@@ -550,7 +545,6 @@ class Args:
     use_focal: bool = False
     label_smoothing: float = 0.05
     class_weights: Optional[str] = None
-    add_delta: bool = False
     se_before_head: bool = False
     dropout: float = 0.0
     workers: int = 4
@@ -563,7 +557,7 @@ class Args:
 
 
 def parse_args() -> Args:
-    p = argparse.ArgumentParser(description="Train Change3DNet on directory dataset (128x128) with reports")
+    p = argparse.ArgumentParser(description="Train Change3DNet on directory dataset (128x128) with reports — no delta")
     p.add_argument('--data_root', default=r'outputs\\sum\\dataset_new', type=str, help='root containing train/, val/, (optional) test/')
     p.add_argument('--classes', default=None, type=str, help='JSON list of class names (order defines label id)')
     p.add_argument('--diff_photometric_classes', default=None, type=str, help='JSON list of class names using different jitter between t1&t2')
@@ -575,9 +569,7 @@ def parse_args() -> Args:
     p.add_argument('--use_focal', action='store_true')
     p.add_argument('--label_smoothing', default=0.05, type=float)
     p.add_argument('--class_weights', default=None, type=str)
-    p.add_argument('--add_delta', action='store_true', help='Add delta channel (disabled by default)')
     p.add_argument('--se_before_head', action='store_true')
-    p.set_defaults(add_delta=False)  # Đảm bảo delta tắt mặc định
     p.add_argument('--dropout', default=0.0, type=float)
     p.add_argument('--workers', default=4, type=int)
     p.add_argument('--seed', default=42, type=int)
@@ -618,8 +610,8 @@ def build_loaders(args: Args):
     aug_train = PairedAugment(PairedAugmentCfg(out_hw=128), diff_photometric_class_ids=diff_ids)
     aug_eval  = PairedAugment(PairedAugmentCfg(out_hw=128), diff_photometric_class_ids=diff_ids)
 
-    train_ds = DirPairsDataset(train_dir, classes, class_to_id, augmenter=aug_train, add_delta=args.add_delta, diff_photometric_ids=diff_ids)
-    val_ds   = DirPairsDataset(val_dir,   classes, class_to_id, augmenter=aug_eval,  add_delta=args.add_delta, diff_photometric_ids=diff_ids)
+    train_ds = DirPairsDataset(train_dir, classes, class_to_id, augmenter=aug_train,  diff_photometric_ids=diff_ids)
+    val_ds   = DirPairsDataset(val_dir,   classes, class_to_id, augmenter=aug_eval,   diff_photometric_ids=diff_ids)
 
     train_loader = DataLoader(
         train_ds,
@@ -645,7 +637,7 @@ def build_loaders(args: Args):
     test_loader = None
     if os.path.isdir(test_dir):
         try:
-            test_ds = DirPairsDataset(test_dir, classes, class_to_id, augmenter=aug_eval, add_delta=args.add_delta, diff_photometric_ids=diff_ids)
+            test_ds = DirPairsDataset(test_dir, classes, class_to_id, augmenter=aug_eval, diff_photometric_ids=diff_ids)
             test_loader = DataLoader(
                 test_ds,
                 batch_size=args.batch_size,
@@ -706,7 +698,7 @@ def main():
     classes, class_to_id, diff_ids, train_loader, val_loader, test_loader = build_loaders(args)
     num_classes = len(classes)
 
-    in_ch = 6 if args.add_delta else 3
+    in_ch = 3
     model = Change3DNet(in_ch=in_ch, num_classes=num_classes, se_before_head=args.se_before_head, drop=args.dropout).to(device)
 
     class_weights = json.loads(args.class_weights) if args.class_weights else None
@@ -824,5 +816,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
