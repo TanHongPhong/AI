@@ -76,7 +76,7 @@ def make_image_grid(images, cols=3, pad=10, bg=(30, 30, 30)):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--folder", default="D:\A UEH_UNIVERSITY\RESEACH\AI - Copy\outputs\sum\cos_sim", help="Thư mục chứa ảnh output")
+    ap.add_argument("--folder", default="outputs\pipeline_results", help="Thư mục chứa ảnh output")
     ap.add_argument("--out", default="summary.png", help="Tên file tổng hợp (khuyến nghị .png để không mờ)")
     ap.add_argument("--cols", type=int, default=3, help="Số cột mỗi hàng")
     ap.add_argument("--pad", type=int, default=10, help="Khoảng cách giữa ảnh")
