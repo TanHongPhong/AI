@@ -540,7 +540,7 @@ def main():
     dino_ckpt = None  # Đường dẫn checkpoint DINOv2 (None để dùng pretrained từ hub)
     change3d_ckpt = r'runs\change3d\20251031_043257\best_change3d_dir.pth'
     output_dir = 'outputs/pipeline_results'
-    sim_threshold = 0.5
+    sim_threshold = 0.4
     # =================================================================================
     
     if not os.path.isfile(img1):
