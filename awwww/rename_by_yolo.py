@@ -51,8 +51,8 @@ def get_dominant_class(image_path: Path, yolo_model) -> int:
 def rename_files_in_folder(folder: Path, yolo_model):
     """Rename all crop/yolo jpg files in folder based on detected class."""
     
-    # Get all crop files (not yolo files)
-    crop_files = sorted([f for f in folder.iterdir() if f.suffix.lower() == '.jpg' and '_yolo' not in f.stem])
+    # Get all crop files (not yolo files, not already renamed)
+    crop_files = sorted([f for f in folder.iterdir() if f.suffix.lower() == '.jpg' and '_yolo' not in f.stem and 'frame_' in f.stem])
     
     if not crop_files:
         print(f"[WARNING] No crop files found in {folder}")
@@ -62,8 +62,10 @@ def rename_files_in_folder(folder: Path, yolo_model):
     print(f"       Found {len(crop_files)} crop files")
     
     renamed_count = 0
+    # Track index per class
+    class_counters = {cls_id: 0 for cls_id in CLASS_MAP}
     
-    for idx, crop_file in enumerate(crop_files, 1):
+    for crop_file in crop_files:
         # Detect class
         cls_id = get_dominant_class(crop_file, yolo_model)
         
@@ -72,6 +74,8 @@ def rename_files_in_folder(folder: Path, yolo_model):
             continue
         
         fruit_name = CLASS_MAP[cls_id]
+        class_counters[cls_id] += 1
+        idx = class_counters[cls_id]
         
         # New name for crop file
         new_crop_name = f"{fruit_name}_class_{idx:03d}.jpg"
