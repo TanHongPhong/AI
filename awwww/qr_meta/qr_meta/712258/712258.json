@@ -1,0 +1,11 @@
+{
+  "id_qr": "712258",
+  "box_name": "BOX-1U5X4H1",
+  "fruit_name": "apple",
+  "quantity": 2,
+  "fruits": {
+    "apple": 2
+  },
+  "note": "",
+  "created_at": "2025-10-19 23:40:52"
+}

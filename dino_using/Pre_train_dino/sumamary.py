@@ -76,9 +76,9 @@ def make_image_grid(images, cols=3, pad=10, bg=(30, 30, 30)):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--folder", default="outputs\pipeline_results", help="Thư mục chứa ảnh output")
+    ap.add_argument("--folder", default=r"D:\A UEH_UNIVERSITY\RESEACH\AI-run\runs\change3d\img", help="Thư mục chứa ảnh output")
     ap.add_argument("--out", default="summary.png", help="Tên file tổng hợp (khuyến nghị .png để không mờ)")
-    ap.add_argument("--cols", type=int, default=3, help="Số cột mỗi hàng")
+    ap.add_argument("--cols", type=int, default=1, help="Số cột mỗi hàng (1 = một cột dọc)")
     ap.add_argument("--pad", type=int, default=10, help="Khoảng cách giữa ảnh")
     ap.add_argument("--thumb_h", type=int, default=-1,
                     help="Chiều cao thumbnail. -1 hoặc 0 = không resize (sắc nét nhất)")
@@ -87,25 +87,62 @@ def main():
     args = ap.parse_args()
 
     folder = args.folder
+    
+    # Kiểm tra folder tồn tại
+    if not os.path.isdir(folder):
+        print(f"[ERROR] Thư mục không tồn tại: {folder}")
+        return
+    
     out_path = os.path.join(folder, args.out)
 
     # Lấy danh sách ảnh (bỏ file summary cũ)
-    paths = [os.path.join(folder, f) for f in os.listdir(folder)
-             if f.lower().endswith((".jpg", ".jpeg", ".png"))
-             and "summary" not in f.lower()]
+    try:
+        all_files = os.listdir(folder)
+    except OSError as e:
+        print(f"[ERROR] Không thể đọc thư mục: {folder}")
+        print(f"[ERROR] Chi tiết: {e}")
+        return
+    
+    # Lọc các file ảnh
+    image_files = [f for f in all_files
+                   if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+    print(f"[INFO] Tổng số file trong thư mục: {len(all_files)}")
+    print(f"[INFO] Số file ảnh tìm thấy: {len(image_files)}")
+    
+    # Chỉ bỏ file có tên chính xác trùng với output (không bỏ tất cả file có "summary")
+    paths = [os.path.join(folder, f) for f in image_files
+             if f.lower() != args.out.lower()]
     paths.sort()
+    
+    print(f"[INFO] Số file ảnh sau khi bỏ '{args.out}': {len(paths)}")
+    if paths:
+        print(f"[INFO] Các file sẽ được xử lý:")
+        for p in paths[:5]:
+            print(f"  - {os.path.basename(p)}")
+        if len(paths) > 5:
+            print(f"  ... và {len(paths) - 5} file khác")
 
     images = []
+    failed_count = 0
     for p in paths:
         img = imread_color(p)
         if img is None:
+            failed_count += 1
             continue
         # Resize tùy chọn (nếu cần thu nhỏ để file tổng hợp không quá to)
         img = maybe_resize(img, args.thumb_h)
         images.append(img)
 
     if not images:
-        print("[ERROR] Không có ảnh hợp lệ trong thư mục.")
+        print(f"[ERROR] Không có ảnh hợp lệ trong thư mục.")
+        print(f"[ERROR] - Tổng số file ảnh: {len(image_files)}")
+        print(f"[ERROR] - File bị loại (trùng với output '{args.out}'): {len(image_files) - len(paths)}")
+        print(f"[ERROR] - File không đọc được: {failed_count}")
+        print(f"[ERROR] - File đọc thành công: {len(images)}")
+        if len(image_files) > 0:
+            print(f"[INFO] Danh sách file ảnh trong thư mục:")
+            for f in image_files:
+                print(f"  - {f}")
         return
 
     grid = make_image_grid(images, cols=args.cols, pad=args.pad, bg=(30, 30, 30))

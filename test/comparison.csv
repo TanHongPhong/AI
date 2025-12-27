@@ -1,18 +1,18 @@
-Metric,No_Delta,With_Delta
-Accuracy,0.9416,0.9197
-Macro F1,0.9409,0.9191
-ROC-AUC,0.9716,0.9768
-False Alarm Rate,0.0584,0.0803
-Num Samples,137,137
-
-Per-Class F1 Score
-F1_mốc,0.9344,0.9120
-F1_xoay&dịch chuyển,0.9474,0.9262
-
-Per-Class Precision
-Precision_mốc,0.9500,0.9048
-Precision_xoay&dịch chuyển,0.9351,0.9324
-
-Per-Class Recall
-Recall_mốc,0.9194,0.9194
-Recall_xoay&dịch chuyển,0.9600,0.9200
+Metric,RGB,RGB+Delta,RGB+Delta+Hadamard
+Accuracy,0.9489,0.9416,0.9489
+Macro F1,0.9484,0.9409,0.9482
+ROC-AUC,0.9735,0.9716,0.9789
+False Alarm Rate,0.0511,0.0584,0.0511
+Num Samples,137,137,137
+,,,
+Per-Class F1 Score,,,
+F1_mốc,0.9431,0.9344,0.9421
+F1_xoay&dịch chuyển,0.9536,0.9474,0.9542
+,,,
+Per-Class Precision,,,
+Precision_mốc,0.9508,0.95,0.9661
+Precision_xoay&dịch chuyển,0.9474,0.9351,0.9359
+,,,
+Per-Class Recall,,,
+Recall_mốc,0.9355,0.9194,0.9194
+Recall_xoay&dịch chuyển,0.96,0.96,0.9733

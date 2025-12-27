@@ -104,6 +104,30 @@ def load_model_from_checkpoint(ckpt_path: str, device: torch.device) -> Tuple[nn
     se_before_head = bool(ckpt_args.get('se_before_head', False))
     dropout = float(ckpt_args.get('dropout', 0.0))
     
+    # Debug: in ra metadata để kiểm tra
+    print(f"[DEBUG] Checkpoint args: add_delta={add_delta}, add_hadamard={add_hadamard}")
+    
+    # Tính số input channels dựa vào checkpoint state_dict để đảm bảo đúng
+    # Kiểm tra kích thước weight của layer đầu tiên
+    state_dict = ckpt.get('state_dict', {})
+    stem_weight_key = 'stem.conv.weight'
+    if stem_weight_key in state_dict:
+        actual_in_ch = state_dict[stem_weight_key].shape[1]
+        print(f"[DEBUG] Detected input channels from model weights: {actual_in_ch}")
+        
+        # Tính toán lại dựa vào actual_in_ch
+        if actual_in_ch == 3:
+            add_delta = False
+            add_hadamard = False
+        elif actual_in_ch == 6:
+            add_delta = True
+            add_hadamard = False
+        elif actual_in_ch == 9:
+            add_delta = True
+            add_hadamard = True
+        else:
+            print(f"[WARN] Unexpected input channels: {actual_in_ch}, using metadata values")
+    
     # Tính số input channels
     in_ch = 3  # RGB base
     if add_delta:
@@ -350,16 +374,16 @@ def save_results_json(results: List[EvaluationResult], classes: List[str], outpu
 
 
 def main():
-    parser = argparse.ArgumentParser(description='So sánh models Change3D: không delta, có delta, có delta+hadamard')
+    parser = argparse.ArgumentParser(description='So sánh models Change3D: RGB, RGB+delta, RGB+delta+hadamard')
     parser.add_argument('--ckpt_no_delta', 
-                       default=r'runs\change3d\20251031_224419_nodenta\best_change3d_dir.pth',
-                       type=str, help='Checkpoint không có delta')
+                       default=r'runs\change3d\20251101_032006\best_change3d_dir.pth',
+                       type=str, help='Checkpoint RGB (không có delta)')
     parser.add_argument('--ckpt_with_delta',
-                       default=r'runs\change3d\20251031_230655\best_change3d_dir.pth',
-                       type=str, help='Checkpoint có delta')
+                       default=r'runs\change3d\20251031_224419_denta\best_change3d_dir.pth',
+                       type=str, help='Checkpoint RGB+delta')
     parser.add_argument('--ckpt_delta_hadamard',
-                       default=None,
-                       type=str, help='Checkpoint có delta + hadamard (optional, nếu None sẽ skip)')
+                       default=r'runs\change3d\20251101_023325_denta_hadam\best_change3d_dir.pth',
+                       type=str, help='Checkpoint RGB+delta+hadamard')
     parser.add_argument('--test_dir',
                        default=r'outputs\sum\dataset_new\val',
                        type=str, help='Thư mục test set (chứa các class subfolders)')
@@ -462,12 +486,16 @@ def main():
     
     result_no_delta = evaluate_model(
         model_no_delta, test_loader_no_delta, device,
-        "No_Delta", classes
+        "RGB", classes
     )
     results.append(result_no_delta)
     
-    # Evaluate model có delta
-    test_dataset_with_delta = build_dataset_for_model(add_delta=True, add_hadamard=False)
+    # Evaluate model có delta - sử dụng metadata từ checkpoint
+    use_delta_from_meta = meta_with_delta['add_delta']
+    use_hadamard_from_meta = meta_with_delta.get('add_hadamard', False)
+    print(f"[INFO] Model RGB+Delta: using add_delta={use_delta_from_meta}, add_hadamard={use_hadamard_from_meta} from checkpoint metadata")
+    
+    test_dataset_with_delta = build_dataset_for_model(add_delta=use_delta_from_meta, add_hadamard=use_hadamard_from_meta)
     test_loader_with_delta = DataLoader(
         test_dataset_with_delta,
         batch_size=args.batch_size,
@@ -479,24 +507,20 @@ def main():
     
     result_with_delta = evaluate_model(
         model_with_delta, test_loader_with_delta, device,
-        "With_Delta", classes
+        "RGB+Delta", classes
     )
     results.append(result_with_delta)
     
-    # Evaluate model có delta + hadamard (nếu có checkpoint)
-    ckpt_delta_hadamard = args.ckpt_delta_hadamard
-    if not ckpt_delta_hadamard:
-        # Tự động tìm checkpoint delta+hadamard mới nhất
-        print("[INFO] Tự động tìm checkpoint Delta+Hadamard mới nhất...")
-        ckpt_delta_hadamard = find_checkpoint_with_delta_hadamard()
-        if ckpt_delta_hadamard:
-            print(f"[INFO] Tìm thấy checkpoint Delta+Hadamard: {ckpt_delta_hadamard}")
-    
-    if ckpt_delta_hadamard and os.path.isfile(ckpt_delta_hadamard):
-        print(f"\n[LOAD] Loading Delta+Hadamard checkpoint...")
-        model_delta_hadamard, meta_delta_hadamard = load_model_from_checkpoint(ckpt_delta_hadamard, device)
+    # Evaluate model có delta + hadamard - sử dụng metadata từ checkpoint
+    if args.ckpt_delta_hadamard and os.path.isfile(args.ckpt_delta_hadamard):
+        print(f"\n[LOAD] Loading RGB+Delta+Hadamard checkpoint...")
+        model_delta_hadamard, meta_delta_hadamard = load_model_from_checkpoint(args.ckpt_delta_hadamard, device)
         
-        test_dataset_delta_hadamard = build_dataset_for_model(add_delta=True, add_hadamard=True)
+        use_delta_meta = meta_delta_hadamard['add_delta']
+        use_hadamard_meta = meta_delta_hadamard.get('add_hadamard', False)
+        print(f"[INFO] Model RGB+Delta+Hadamard: using add_delta={use_delta_meta}, add_hadamard={use_hadamard_meta} from checkpoint metadata")
+        
+        test_dataset_delta_hadamard = build_dataset_for_model(add_delta=use_delta_meta, add_hadamard=use_hadamard_meta)
         test_loader_delta_hadamard = DataLoader(
             test_dataset_delta_hadamard,
             batch_size=args.batch_size,
@@ -508,14 +532,11 @@ def main():
         
         result_delta_hadamard = evaluate_model(
             model_delta_hadamard, test_loader_delta_hadamard, device,
-            "Delta+Hadamard", classes
+            "RGB+Delta+Hadamard", classes
         )
         results.append(result_delta_hadamard)
     else:
-        if args.ckpt_delta_hadamard:
-            print(f"[WARN] Checkpoint Delta+Hadamard không tồn tại: {args.ckpt_delta_hadamard}, sẽ bỏ qua.")
-        else:
-            print("[INFO] Không tìm thấy checkpoint Delta+Hadamard, chỉ so sánh 2 models.")
+        print(f"[WARN] Checkpoint RGB+Delta+Hadamard không tồn tại: {args.ckpt_delta_hadamard}, sẽ bỏ qua model này.")
     
     # Save results
     print("\n[SAVE] Saving results...")

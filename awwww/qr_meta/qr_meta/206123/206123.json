@@ -1,0 +1,11 @@
+{
+  "id_qr": "206123",
+  "box_name": "BOX-17DG91B",
+  "fruit_name": "pear",
+  "quantity": 2,
+  "fruits": {
+    "pear": 2
+  },
+  "note": "",
+  "created_at": "2025-10-19 23:41:11"
+}

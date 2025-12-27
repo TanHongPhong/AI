@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse Check - So sánh Before/After</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e8e8e8;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-bar {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .status-dot.green {
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff88;
+        }
+
+        .status-dot.red {
+            background: #ff4757;
+            box-shadow: 0 0 10px #ff4757;
+        }
+
+        .upload-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .upload-box {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .upload-box:hover {
+            border-color: #00d9ff;
+            background: rgba(0, 217, 255, 0.1);
+        }
+
+        .upload-box.before {
+            border-color: rgba(0, 217, 255, 0.5);
+        }
+
+        .upload-box.after {
+            border-color: rgba(0, 255, 136, 0.5);
+        }
+
+        .upload-box h3 {
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        .upload-box.before h3 {
+            color: #00d9ff;
+        }
+
+        .upload-box.after h3 {
+            color: #00ff88;
+        }
+
+        .upload-box input {
+            display: none;
+        }
+
+        .upload-box .icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .upload-box .filename {
+            margin-top: 10px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .process-btn {
+            width: 100%;
+            padding: 20px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            color: #1a1a2e;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 30px;
+        }
+
+        .process-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 217, 255, 0.3);
+        }
+
+        .process-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .result-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .result-header h2 {
+            color: #00ff88;
+            margin-bottom: 10px;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .result-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .result-card.before {
+            border: 2px solid rgba(0, 217, 255, 0.3);
+        }
+
+        .result-card.after {
+            border: 2px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .result-card-header {
+            padding: 15px 20px;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .result-card.before .result-card-header {
+            background: rgba(0, 217, 255, 0.2);
+            color: #00d9ff;
+        }
+
+        .result-card.after .result-card-header {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+
+        .result-card-body {
+            padding: 20px;
+        }
+
+        .preview-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .preview-tab {
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #e8e8e8;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .preview-tab.active {
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            color: #1a1a2e;
+        }
+
+        .preview-image {
+            width: 100%;
+            border-radius: 8px;
+            background: #000;
+        }
+
+        .info-section {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .info-label {
+            color: #888;
+        }
+
+        .info-value {
+            font-weight: bold;
+        }
+
+        .validation-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .validation-badge.passed {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+
+        .validation-badge.failed {
+            background: rgba(255, 71, 87, 0.2);
+            color: #ff4757;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #00d9ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .frame-selector {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+        }
+
+        .frame-selector.show {
+            display: block;
+        }
+
+        .frame-selector h4 {
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .frame-thumbnails {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .frame-thumb {
+            cursor: pointer;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .frame-thumb:hover {
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .frame-thumb.selected {
+            border-color: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        .frame-thumb img {
+            width: 100%;
+            display: block;
+        }
+
+        .frame-thumb .frame-idx {
+            text-align: center;
+            font-size: 0.7rem;
+            padding: 4px;
+            background: rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📦 Warehouse Check</h1>
+
+        <div class="status-bar" id="statusBar">
+            <div class="status-item">
+                <div class="status-dot" id="yoloStatus"></div>
+                <span>YOLO Model</span>
+            </div>
+            <div class="status-item">
+                <div class="status-dot" id="u2netStatus"></div>
+                <span>U2Net Model</span>
+            </div>
+            <div class="status-item">
+                <div class="status-dot" id="qrMetaStatus"></div>
+                <span>QR Metadata: <span id="qrMetaCount">0</span> files</span>
+            </div>
+        </div>
+
+        <div class="upload-section">
+            <div class="upload-box before" onclick="document.getElementById('beforeInput').click()">
+                <div class="icon">📤</div>
+                <h3>BEFORE (Supplier)</h3>
+                <p>Video/Ảnh tại nhà cung cấp</p>
+                <input type="file" id="beforeInput" accept="video/*,image/*">
+                <div class="filename" id="beforeFilename"></div>
+                <div class="frame-selector" id="beforeFrames" onclick="event.stopPropagation()">
+                    <h4>🎬 Chọn frame để so sánh:</h4>
+                    <div class="frame-thumbnails" id="beforeThumbnails"></div>
+                </div>
+            </div>
+
+            <div class="upload-box after" onclick="document.getElementById('afterInput').click()">
+                <div class="icon">📥</div>
+                <h3>AFTER (Warehouse)</h3>
+                <p>Video/Ảnh tại nhà kho</p>
+                <input type="file" id="afterInput" accept="video/*,image/*">
+                <div class="filename" id="afterFilename"></div>
+                <div class="frame-selector" id="afterFrames" onclick="event.stopPropagation()">
+                    <h4>🎬 Chọn frame để so sánh:</h4>
+                    <div class="frame-thumbnails" id="afterThumbnails"></div>
+                </div>
+            </div>
+        </div>
+
+        <button class="process-btn" id="processBtn" onclick="processFiles()" disabled>
+            🔍 So sánh Before / After
+        </button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Đang xử lý... QR → YOLO → U2Net → Canonical</p>
+        </div>
+
+        <div class="results" id="results">
+            <div class="result-header">
+                <h2>✅ Kết quả so sánh</h2>
+                <p>Box ID: <strong id="boxId"></strong> | Saved to: <code id="outputFolder"></code></p>
+            </div>
+
+            <div class="comparison-grid">
+                <!-- Before -->
+                <div class="result-card before">
+                    <div class="result-card-header">📤 BEFORE (Supplier)</div>
+                    <div class="result-card-body">
+                        <div class="preview-tabs">
+                            <button class="preview-tab active"
+                                onclick="showPreview('before', 'yolo', this)">YOLO</button>
+                            <button class="preview-tab"
+                                onclick="showPreview('before', 'segmentation', this)">Segment</button>
+                            <button class="preview-tab"
+                                onclick="showPreview('before', 'canonical', this)">Canonical</button>
+                        </div>
+                        <img class="preview-image" id="beforePreview" src="">
+                        <div class="info-section">
+                            <div class="info-row">
+                                <span class="info-label">QR Info</span>
+                                <span class="info-value" id="beforeQR">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Validation</span>
+                                <span id="beforeValidation"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Rotation</span>
+                                <span class="info-value" id="beforeRotation">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- After -->
+                <div class="result-card after">
+                    <div class="result-card-header">📥 AFTER (Warehouse)</div>
+                    <div class="result-card-body">
+                        <div class="preview-tabs">
+                            <button class="preview-tab active"
+                                onclick="showPreview('after', 'yolo', this)">YOLO</button>
+                            <button class="preview-tab"
+                                onclick="showPreview('after', 'segmentation', this)">Segment</button>
+                            <button class="preview-tab"
+                                onclick="showPreview('after', 'canonical', this)">Canonical</button>
+                        </div>
+                        <img class="preview-image" id="afterPreview" src="">
+                        <div class="info-section">
+                            <div class="info-row">
+                                <span class="info-label">QR Info</span>
+                                <span class="info-value" id="afterQR">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Validation</span>
+                                <span id="afterValidation"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Rotation</span>
+                                <span class="info-value" id="afterRotation">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let beforeFile = null;
+        let afterFile = null;
+        let resultData = null;
+        let beforeFrameIdx = 0;
+        let afterFrameIdx = 0;
+
+        // Check status on load
+        async function checkStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+
+                document.getElementById('yoloStatus').classList.add(data.yolo_loaded ? 'green' : 'red');
+                document.getElementById('u2netStatus').classList.add(data.u2net_loaded ? 'green' : 'red');
+                document.getElementById('qrMetaStatus').classList.add(data.qr_meta_count > 0 ? 'green' : 'red');
+                document.getElementById('qrMetaCount').textContent = data.qr_meta_count;
+            } catch (e) {
+                console.error('Status check failed:', e);
+            }
+        }
+
+        checkStatus();
+
+        // File handlers with frame extraction
+        document.getElementById('beforeInput').addEventListener('change', async (e) => {
+            beforeFile = e.target.files[0];
+            document.getElementById('beforeFilename').textContent = beforeFile ? beforeFile.name : '';
+            beforeFrameIdx = 0;
+
+            if (beforeFile && beforeFile.type.startsWith('video/')) {
+                await extractFrames('before', beforeFile);
+            } else {
+                document.getElementById('beforeFrames').classList.remove('show');
+            }
+            updateProcessBtn();
+        });
+
+        document.getElementById('afterInput').addEventListener('change', async (e) => {
+            afterFile = e.target.files[0];
+            document.getElementById('afterFilename').textContent = afterFile ? afterFile.name : '';
+            afterFrameIdx = 0;
+
+            if (afterFile && afterFile.type.startsWith('video/')) {
+                await extractFrames('after', afterFile);
+            } else {
+                document.getElementById('afterFrames').classList.remove('show');
+            }
+            updateProcessBtn();
+        });
+
+        async function extractFrames(stage, file) {
+            const formData = new FormData();
+            formData.append('video', file);
+            formData.append('num_frames', 4);
+
+            try {
+                const res = await fetch('/api/extract-frames', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (data.success && data.frames.length > 0) {
+                    displayFrameThumbnails(stage, data.frames);
+                }
+            } catch (e) {
+                console.error('Extract frames failed:', e);
+            }
+        }
+
+        function displayFrameThumbnails(stage, frames) {
+            const container = document.getElementById(stage + 'Thumbnails');
+            container.innerHTML = '';
+
+            frames.forEach((frame, i) => {
+                const div = document.createElement('div');
+                div.className = 'frame-thumb' + (i === 0 ? ' selected' : '');
+                div.innerHTML = `
+                    <img src="data:image/jpeg;base64,${frame.thumbnail}">
+                    <div class="frame-idx">Frame ${frame.index}</div>
+                `;
+                div.onclick = () => selectFrame(stage, frame.index, div);
+                container.appendChild(div);
+            });
+
+            document.getElementById(stage + 'Frames').classList.add('show');
+        }
+
+        function selectFrame(stage, index, element) {
+            // Update selection
+            element.parentElement.querySelectorAll('.frame-thumb').forEach(t => t.classList.remove('selected'));
+            element.classList.add('selected');
+
+            if (stage === 'before') {
+                beforeFrameIdx = index;
+            } else {
+                afterFrameIdx = index;
+            }
+        }
+
+        function updateProcessBtn() {
+            document.getElementById('processBtn').disabled = !(beforeFile && afterFile);
+        }
+
+        async function processFiles() {
+            if (!beforeFile || !afterFile) return;
+
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('results').classList.remove('show');
+            document.getElementById('processBtn').disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('before', beforeFile);
+                formData.append('after', afterFile);
+                formData.append('before_frame', beforeFrameIdx);
+                formData.append('after_frame', afterFrameIdx);
+
+                const res = await fetch('/api/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    resultData = data;
+                    displayResults(data);
+                } else {
+                    alert('Error: ' + (data.detail || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('processBtn').disabled = false;
+            }
+        }
+
+        function displayResults(data) {
+            document.getElementById('boxId').textContent = data.box_id;
+            document.getElementById('outputFolder').textContent = data.output_folder;
+
+            // Before
+            if (data.before.preview.yolo) {
+                document.getElementById('beforePreview').src = 'data:image/jpeg;base64,' + data.before.preview.yolo;
+            }
+            document.getElementById('beforeQR').textContent = data.before.qr_info?._qr || '-';
+            document.getElementById('beforeRotation').textContent = data.before.rotation || '-';
+
+            if (data.before.validation) {
+                const passed = data.before.validation.passed;
+                document.getElementById('beforeValidation').innerHTML =
+                    `<span class="validation-badge ${passed ? 'passed' : 'failed'}">${passed ? '✅ Passed' : '❌ Failed'}</span>`;
+            }
+
+            // After
+            if (data.after.preview.yolo) {
+                document.getElementById('afterPreview').src = 'data:image/jpeg;base64,' + data.after.preview.yolo;
+            }
+            document.getElementById('afterQR').textContent = data.after.qr_info?._qr || '-';
+            document.getElementById('afterRotation').textContent = data.after.rotation || '-';
+
+            if (data.after.validation) {
+                const passed = data.after.validation.passed;
+                document.getElementById('afterValidation').innerHTML =
+                    `<span class="validation-badge ${passed ? 'passed' : 'failed'}">${passed ? '✅ Passed' : '❌ Failed'}</span>`;
+            }
+
+            document.getElementById('results').classList.add('show');
+        }
+
+        function showPreview(stage, type, btn) {
+            if (!resultData) return;
+
+            // Update active tab
+            btn.parentElement.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Update image
+            const preview = resultData[stage].preview[type];
+            if (preview) {
+                document.getElementById(stage + 'Preview').src = 'data:image/jpeg;base64,' + preview;
+            }
+        }
+    </script>
+</body>
+
+</html>

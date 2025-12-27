@@ -1,0 +1,11 @@
+{
+  "id_qr": "931482",
+  "box_name": "BOX-1QCF7NS",
+  "fruit_name": "tangerine",
+  "quantity": 2,
+  "fruits": {
+    "tangerine": 2
+  },
+  "note": "",
+  "created_at": "2025-10-19 23:39:26"
+}
