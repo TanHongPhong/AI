@@ -1,0 +1,18 @@
+# Large video files (>100MB for GitHub)
+awwww/video/khong_sao/*.mp4
+awwww/output_khongsao/yolo/*.mp4
+
+# Other large videos (>50MB warning)
+awwww/video/moc/*.mp4
+awwww/video/trao_doi/*.mp4
+awwww/video/trao_doi/qua_trinh_trao/*.mp4
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# IDE
+.vscode/
+.idea/
